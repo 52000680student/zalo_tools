@@ -1,0 +1,30 @@
+{
+    "name": "zalo-tools-api",
+    "version": "1.0.0",
+    "description": "API for finding Zalo users by phone number and sending messages",
+    "main": "index.js",
+    "type": "module",
+    "scripts": {
+        "start": "node index.js",
+        "dev": "nodemon index.js",
+        "test": "node test.js"
+    },
+    "dependencies": {
+        "cors": "^2.8.5",
+        "dotenv": "^16.6.1",
+        "express": "^4.21.2",
+        "node-fetch": "^3.3.2",
+        "zca-js": "^1.6.0"
+    },
+    "devDependencies": {
+        "nodemon": "^3.0.1"
+    },
+    "keywords": [
+        "zalo",
+        "api",
+        "nodejs",
+        "express"
+    ],
+    "author": "Your Name",
+    "license": "MIT"
+}

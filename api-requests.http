@@ -1,0 +1,32 @@
+# Sample API Requests for Zalo Tools
+
+## 1. Health Check
+GET http://localhost:3000/health
+
+## 2. Find User by Phone Number
+POST http://localhost:3000/api/find-user
+Content-Type: application/json
+
+{
+  "phoneNumber": "0859852091"
+}
+
+## 3. Send Message to User (with default message)
+POST http://localhost:3000/api/send-message
+Content-Type: application/json
+
+{
+  "phoneNumber": "0859852091"
+}
+
+## 4. Send Custom Message to User
+POST http://localhost:3000/api/send-message
+Content-Type: application/json
+
+{
+  "phoneNumber": "0859852091",
+  "message": "Hello! This is a custom message from Zalo Tools API."
+}
+
+## 5. Get Account Information
+GET http://localhost:3000/api/account-info
