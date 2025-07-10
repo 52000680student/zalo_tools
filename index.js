@@ -3,6 +3,10 @@ import cors from 'cors';
 import { Zalo } from 'zca-js';
 import fs from 'fs';
 import path from 'path';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,11 +25,11 @@ async function initializeZalo() {
         const cookieData = JSON.parse(fs.readFileSync('cookie.json', 'utf-8'));
         // Convert cookie array to string format for zca-js
         const cookieString = cookieData.map(cookie => `${cookie.name}=${cookie.value}`).join('; ');
-        const z_uuid = 'ee2dc7fa-8b3f-4971-b6d3-85e1b5a0dff7-d2ad6785d256851dd366703bdc61aa61';
-        const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0';
+        const z_uuid = process.env.Z_UUID;
+        const userAgent = process.env.USER_AGENT;
 
         if (!z_uuid || !userAgent) {
-            throw new Error('Missing z_uuid or userAgent in todo.txt');
+            throw new Error('Missing Z_UUID or USER_AGENT in environment variables');
         }
 
         // Create new Zalo instance with login credentials
@@ -59,8 +63,8 @@ async function initializeZalo() {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-    res.json({ 
-        status: 'OK', 
+    res.json({
+        status: 'OK',
         zaloConnected: zaloApi !== null,
         timestamp: new Date().toISOString()
     });
@@ -91,10 +95,10 @@ app.post('/api/send-message', async (req, res) => {
         const messageToSend = message || 'Hello! This is an automated message from Zalo Tools API.';
 
         console.log(`Finding user with phone number: ${phoneNumber}`);
-        
+
         // Find user by phone number
         const userInfo = await zaloApi.findUser(phoneNumber);
-        
+
         if (!userInfo || !userInfo.uid) {
             return res.status(404).json({
                 success: false,
@@ -146,7 +150,7 @@ app.post('/api/send-message', async (req, res) => {
 
     } catch (error) {
         console.error('Error in send-message endpoint:', error);
-        
+
         if (error.message && error.message.includes('not found')) {
             return res.status(404).json({
                 success: false,
@@ -261,7 +265,7 @@ app.use('*', (req, res) => {
 async function startServer() {
     // Initialize Zalo connection first
     const zaloInitialized = await initializeZalo();
-    
+
     if (!zaloInitialized) {
         console.warn('Warning: Zalo API failed to initialize. Some endpoints may not work.');
     }
