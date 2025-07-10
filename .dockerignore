@@ -123,5 +123,11 @@ test.js
 api-requests.http
 todo.txt
 
+# Uploads folder (temporary files)
+uploads/
+
 # DevDependencies aren't needed in production
 .devcontainer/
+
+# Keep docker entrypoint script
+!docker-entrypoint.sh

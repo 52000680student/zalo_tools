@@ -4,6 +4,13 @@ import { Zalo } from 'zca-js';
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
+import fetch from 'node-fetch';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+// Get current directory for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Load environment variables
 dotenv.config();
@@ -18,6 +25,103 @@ app.use(express.json());
 // Initialize Zalo API
 let zaloApi = null;
 
+// Ensure upload directory exists
+function ensureUploadDirectory() {
+    const uploadDir = path.join(__dirname, 'uploads');
+    if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+        console.log('Created uploads directory');
+    }
+    return uploadDir;
+}
+
+// Remove auto-print functionality from PDF buffer
+function removeAutoPrintFromPDF(buffer) {
+    try {
+        let pdfContent = buffer.toString('binary');
+        
+        // Common auto-print JavaScript patterns to remove
+        const autoPrintPatterns = [
+            /this\.print\(\s*\)/gi,                    // this.print()
+            /window\.print\(\s*\)/gi,                  // window.print()
+            /print\(\s*\)/gi,                          // print()
+            /\/S\s*\/JavaScript\s*\/JS\s*\(print\(\)\)/gi, // PDF action dictionary
+            /\/OpenAction\s*<<[^>]*\/S\s*\/JavaScript[^>]*print\(\)[^>]*>>/gi, // OpenAction with print
+            /\/AA\s*<<[^>]*\/O\s*<<[^>]*\/S\s*\/JavaScript[^>]*print\(\)[^>]*>>[^>]*>>/gi, // Additional Actions
+            /\/Names\s*<<[^>]*\/JavaScript[^>]*print\(\)[^>]*>>/gi, // Named JavaScript actions
+            /\/Catalog\s*<<[^>]*\/OpenAction[^>]*print\(\)[^>]*>>/gi, // Catalog OpenAction
+        ];
+        
+        // Remove auto-print patterns
+        let originalLength = pdfContent.length;
+        autoPrintPatterns.forEach(pattern => {
+            pdfContent = pdfContent.replace(pattern, '');
+        });
+        
+        // Remove OpenAction references that might trigger auto-print
+        pdfContent = pdfContent.replace(/\/OpenAction\s+\d+\s+\d+\s+R/gi, '');
+        
+        // Remove any remaining JavaScript actions that contain 'print'
+        pdfContent = pdfContent.replace(/\/JS\s*\([^)]*print[^)]*\)/gi, '/JS ()');
+        
+        if (pdfContent.length !== originalLength) {
+            console.log('Auto-print functionality detected and removed from PDF');
+        } else {
+            console.log('No auto-print functionality detected in PDF');
+        }
+        
+        return Buffer.from(pdfContent, 'binary');
+    } catch (error) {
+        console.warn('Failed to remove auto-print from PDF, using original:', error.message);
+        return buffer; // Return original buffer if processing fails
+    }
+}
+
+// Download PDF file from URL and remove auto-print functionality
+async function downloadPDF(url, filename) {
+    try {
+        console.log(`Downloading PDF from: ${url}`);
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('pdf')) {
+            console.warn(`Warning: Content type is ${contentType}, expected PDF`);
+        }
+
+        let buffer = await response.buffer();
+        
+        // Remove auto-print functionality from PDF
+        buffer = removeAutoPrintFromPDF(buffer);
+        
+        const uploadDir = ensureUploadDirectory();
+        const filePath = path.join(uploadDir, filename);
+        
+        fs.writeFileSync(filePath, buffer);
+        console.log(`PDF downloaded successfully to: ${filePath}`);
+        
+        return filePath;
+    } catch (error) {
+        console.error('Error downloading PDF:', error);
+        throw error;
+    }
+}
+
+// Clean up file after use
+function cleanupFile(filePath) {
+    try {
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+            console.log(`Cleaned up file: ${filePath}`);
+        }
+    } catch (error) {
+        console.error('Error cleaning up file:', error);
+    }
+}
+
 // Initialize Zalo connection
 async function initializeZalo() {
     try {
@@ -27,8 +131,7 @@ async function initializeZalo() {
         const cookieString = cookieData.map(cookie => `${cookie.name}=${cookie.value}`).join('; ');
         const z_uuid = process.env.Z_UUID;
         const userAgent = process.env.USER_AGENT;
-
-        if (!z_uuid || !userAgent) {
+        if (!z_uuid || !userAgent ) {
             throw new Error('Missing Z_UUID or USER_AGENT in environment variables');
         }
 
@@ -72,8 +175,10 @@ app.get('/health', (req, res) => {
 
 // Find user by phone number and send message
 app.post('/api/send-message', async (req, res) => {
+    let downloadedFilePath = null;
+    
     try {
-        const { phoneNumber, message } = req.body;
+        const { phoneNumber, message, urlResult } = req.body;
 
         // Validate input
         if (!phoneNumber) {
@@ -113,28 +218,64 @@ app.post('/api/send-message', async (req, res) => {
             phone: phoneNumber
         });
 
-        // Send message to the user
-        console.log(`Sending message to user: ${userInfo.display_name || userInfo.zalo_name}`);
-        const sendResult = await zaloApi.sendMessage(messageToSend, userInfo.uid);
+        let sendResult;
+
+        // Handle PDF download and attachment if urlResult is provided
+        if (urlResult) {
+            try {
+                const lisUrl = process.env.LIS_URL;
+                if (!lisUrl) {
+                    throw new Error('LIS_URL environment variable is required for PDF download');
+                }
+
+                // Combine lisUrl with urlResult to create the full PDF download URL
+                const fullPdfUrl = lisUrl + urlResult;
+                // Generate unique filename for the PDF
+                const filename = `ket_qua_${Date.now()}.pdf`;
+                // Download the PDF file
+                downloadedFilePath = await downloadPDF(fullPdfUrl, filename);
+
+                // Send message with file attachment
+                console.log(`Sending message with PDF attachment to user: ${userInfo.display_name || userInfo.zalo_name}`);
+                sendResult = await zaloApi.sendMessage({
+                    msg: messageToSend,
+                    attachments: [downloadedFilePath]
+                }, userInfo.uid);
+
+            } catch (pdfError) {
+                console.error('Error processing PDF:', pdfError);
+                return res.status(500).json({
+                success: false,
+                error: 'Failed to send message',
+                userInfo: {
+                    uid: userInfo.uid,
+                    display_name: userInfo.display_name,
+                    zalo_name: userInfo.zalo_name
+                }
+            });
+            }
+        } else {
+            // Send regular text message
+            console.log(`Sending text message to user: ${userInfo.display_name || userInfo.zalo_name}`);
+            sendResult = await zaloApi.sendMessage(messageToSend, userInfo.uid);
+        }
+
+        // Clean up downloaded file if it exists
+        if (downloadedFilePath) {
+            cleanupFile(downloadedFilePath);
+        }
 
         if (sendResult && sendResult.message) {
             return res.json({
                 success: true,
-                data: {
-                    userInfo: {
+                userInfo: {
                         uid: userInfo.uid,
                         display_name: userInfo.display_name,
                         zalo_name: userInfo.zalo_name,
                         avatar: userInfo.avatar,
                         phoneNumber: phoneNumber
-                    },
-                    message: {
-                        content: messageToSend,
-                        messageId: sendResult.message.msgId,
-                        sentAt: new Date().toISOString()
-                    }
                 },
-                message: 'Message sent successfully!'
+                message: urlResult ? 'Gửi kết quả thành công!' : 'Gửi tin nhắn thành công!'
             });
         } else {
             return res.status(500).json({
@@ -150,6 +291,11 @@ app.post('/api/send-message', async (req, res) => {
 
     } catch (error) {
         console.error('Error in send-message endpoint:', error);
+
+        // Clean up downloaded file if it exists and there was an error
+        if (downloadedFilePath) {
+            cleanupFile(downloadedFilePath);
+        }
 
         if (error.message && error.message.includes('not found')) {
             return res.status(404).json({
@@ -274,9 +420,10 @@ async function startServer() {
         console.log(`Server is running on port ${PORT}`);
         console.log(`Health check: http://localhost:${PORT}/health`);
         console.log(`API Endpoints:`);
-        console.log(`  POST /api/send-message - Find user and send message`);
+        console.log(`  POST /api/send-message - Find user and send message (with optional PDF attachment)`);
         console.log(`  POST /api/find-user - Find user information`);
         console.log(`  GET /api/account-info - Get current account info`);
+        console.log(`\nNote: Send message endpoint supports PDF attachments via urlResult parameter`);
     });
 }
 
