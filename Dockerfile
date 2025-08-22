@@ -19,10 +19,6 @@ RUN npm ci --only=production --no-audit --no-fund && \
 # Copy application code
 COPY . .
 
-# Copy and set permissions for entrypoint script in one layer
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
 # Create uploads directory and change ownership in one layer
 RUN mkdir -p /app/uploads && \
     chown -R nextjs:nodejs /app
@@ -47,4 +43,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 ENTRYPOINT ["dumb-init", "--"]
 
 # Command to run the application
-CMD ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["npm", "start"]

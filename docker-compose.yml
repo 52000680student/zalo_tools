@@ -1,10 +1,7 @@
-version: '3.8'
-
 services:
   zalo-tools-api:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: registry.iolis.solutions/iolis-mednova/landingpage:1.0
+    container_name: zalo-tools-api
     ports:
       - "3001:3001"
     environment:
@@ -13,8 +10,6 @@ services:
     env_file:
       - .env
     volumes:
-      # Mount cookie.json as a volume so it can be updated without rebuilding
-      - ./cookie.json:/app/cookie.json:ro
       # Mount uploads directory for temporary file storage
       - uploads_data:/app/uploads
     restart: unless-stopped
@@ -24,12 +19,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    networks:
-      - zalo-network
 
 networks:
-  zalo-network:
-    driver: bridge
+  default:
+    name: iolis-network
+    external: true
 
 volumes:
   uploads_data:

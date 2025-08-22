@@ -7,6 +7,8 @@ import dotenv from 'dotenv';
 import fetch from 'node-fetch';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+// Import cookie data
+import cookieData from './cookieData.js';
 
 // Get current directory for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -39,7 +41,7 @@ function ensureUploadDirectory() {
 function removeAutoPrintFromPDF(buffer) {
     try {
         let pdfContent = buffer.toString('binary');
-        
+
         // Common auto-print JavaScript patterns to remove
         const autoPrintPatterns = [
             /this\.print\(\s*\)/gi,                    // this.print()
@@ -51,25 +53,25 @@ function removeAutoPrintFromPDF(buffer) {
             /\/Names\s*<<[^>]*\/JavaScript[^>]*print\(\)[^>]*>>/gi, // Named JavaScript actions
             /\/Catalog\s*<<[^>]*\/OpenAction[^>]*print\(\)[^>]*>>/gi, // Catalog OpenAction
         ];
-        
+
         // Remove auto-print patterns
         let originalLength = pdfContent.length;
         autoPrintPatterns.forEach(pattern => {
             pdfContent = pdfContent.replace(pattern, '');
         });
-        
+
         // Remove OpenAction references that might trigger auto-print
         pdfContent = pdfContent.replace(/\/OpenAction\s+\d+\s+\d+\s+R/gi, '');
-        
+
         // Remove any remaining JavaScript actions that contain 'print'
         pdfContent = pdfContent.replace(/\/JS\s*\([^)]*print[^)]*\)/gi, '/JS ()');
-        
+
         if (pdfContent.length !== originalLength) {
             console.log('Auto-print functionality detected and removed from PDF');
         } else {
             console.log('No auto-print functionality detected in PDF');
         }
-        
+
         return Buffer.from(pdfContent, 'binary');
     } catch (error) {
         console.warn('Failed to remove auto-print from PDF, using original:', error.message);
@@ -82,7 +84,7 @@ async function downloadPDF(url, filename) {
     try {
         console.log(`Downloading PDF from: ${url}`);
         const response = await fetch(url);
-        
+
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -93,16 +95,16 @@ async function downloadPDF(url, filename) {
         }
 
         let buffer = await response.buffer();
-        
+
         // Remove auto-print functionality from PDF
         buffer = removeAutoPrintFromPDF(buffer);
-        
+
         const uploadDir = ensureUploadDirectory();
         const filePath = path.join(uploadDir, filename);
-        
+
         fs.writeFileSync(filePath, buffer);
         console.log(`PDF downloaded successfully to: ${filePath}`);
-        
+
         return filePath;
     } catch (error) {
         console.error('Error downloading PDF:', error);
@@ -125,29 +127,27 @@ function cleanupFile(filePath) {
 // Initialize Zalo connection
 async function initializeZalo() {
     try {
-        // Read cookie from file
-        const cookieData = JSON.parse(fs.readFileSync('cookie.json', 'utf-8'));
-        // Convert cookie array to string format for zca-js
-        const cookieString = cookieData.map(cookie => `${cookie.name}=${cookie.value}`).join('; ');
         const z_uuid = process.env.Z_UUID;
         const userAgent = process.env.USER_AGENT;
-        if (!z_uuid || !userAgent ) {
+        if (!z_uuid || !userAgent) {
             throw new Error('Missing Z_UUID or USER_AGENT in environment variables');
         }
 
-        // Create new Zalo instance with login credentials
+        // Create new Zalo instance with options
         const zalo = new Zalo({
-            cookie: cookieString,
-            imei: z_uuid,
-            userAgent: userAgent
-        }, {
             selfListen: false, // mặc định false, lắng nghe sự kiện của bản thân
-            checkUpdate: true // mặc định true, kiểm tra update
+            checkUpdate: true, // mặc định true, kiểm tra update
+            polyfill: fetch // ensure fetch is available for update check
         });
 
         // Login to get the API instance
         console.log('Logging in to Zalo...');
-        zaloApi = await zalo.login();
+        zaloApi = await zalo.login({
+            cookie: cookieData, // pass cookie array directly per zca-js API
+            imei: z_uuid,
+            userAgent: userAgent,
+            language: 'vi'
+        });
 
         // Start listening for events
         if (zaloApi.listener) {
@@ -176,7 +176,6 @@ app.get('/health', (req, res) => {
 // Find user by phone number and send message
 app.post('/api/send-message', async (req, res) => {
     let downloadedFilePath = null;
-    
     try {
         const { phoneNumber, message, urlResult } = req.body;
 
@@ -198,28 +197,18 @@ app.post('/api/send-message', async (req, res) => {
 
         // Use default message if not provided
         const messageToSend = message || 'Hello! This is an automated message from Zalo Tools API.';
-
-        console.log(`Finding user with phone number: ${phoneNumber}`);
-
         // Find user by phone number
         const userInfo = await zaloApi.findUser(phoneNumber);
 
         if (!userInfo || !userInfo.uid) {
             return res.status(404).json({
                 success: false,
-                error: 'User not found with the provided phone number',
+                error: `Không tìm thấy người dùng với số điện thoại ${phoneNumber}`,
                 phoneNumber: phoneNumber
             });
         }
 
-        console.log('User found:', {
-            uid: userInfo.uid,
-            name: userInfo.display_name || userInfo.zalo_name,
-            phone: phoneNumber
-        });
-
         let sendResult;
-
         // Handle PDF download and attachment if urlResult is provided
         if (urlResult) {
             try {
@@ -245,14 +234,9 @@ app.post('/api/send-message', async (req, res) => {
             } catch (pdfError) {
                 console.error('Error processing PDF:', pdfError);
                 return res.status(500).json({
-                success: false,
-                error: 'Failed to send message',
-                userInfo: {
-                    uid: userInfo.uid,
-                    display_name: userInfo.display_name,
-                    zalo_name: userInfo.zalo_name
-                }
-            });
+                    success: false,
+                    error: 'Không thể tải xuống hoặc xử lý tệp PDF: ' + pdfError.message,
+                });
             }
         } else {
             // Send regular text message
@@ -268,30 +252,17 @@ app.post('/api/send-message', async (req, res) => {
         if (sendResult && sendResult.message) {
             return res.json({
                 success: true,
-                userInfo: {
-                        uid: userInfo.uid,
-                        display_name: userInfo.display_name,
-                        zalo_name: userInfo.zalo_name,
-                        avatar: userInfo.avatar,
-                        phoneNumber: phoneNumber
-                },
                 message: urlResult ? 'Gửi kết quả thành công!' : 'Gửi tin nhắn thành công!'
             });
         } else {
             return res.status(500).json({
                 success: false,
-                error: 'Failed to send message',
-                userInfo: {
-                    uid: userInfo.uid,
-                    display_name: userInfo.display_name,
-                    zalo_name: userInfo.zalo_name
-                }
+                error: 'Không gửi được kết quả',
             });
         }
 
     } catch (error) {
         console.error('Error in send-message endpoint:', error);
-
         // Clean up downloaded file if it exists and there was an error
         if (downloadedFilePath) {
             cleanupFile(downloadedFilePath);
