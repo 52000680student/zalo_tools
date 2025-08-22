@@ -137,7 +137,7 @@ async function initializeZalo() {
         const zalo = new Zalo({
             selfListen: false, // mặc định false, lắng nghe sự kiện của bản thân
             checkUpdate: true, // mặc định true, kiểm tra update
-            polyfill: fetch // ensure fetch is available for update check
+            polyfill: fetch // ensure fetch is available for update chec
         });
 
         // Login to get the API instance
