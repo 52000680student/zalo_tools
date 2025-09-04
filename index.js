@@ -7,8 +7,8 @@ import dotenv from 'dotenv';
 import fetch from 'node-fetch';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-// Import cookie data
-import cookieData from './cookieData.js';
+// Import cookie data (fallback)
+import cookieDataFallback from './cookieData.js';
 
 // Get current directory for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -27,6 +27,36 @@ app.use(express.json());
 // Initialize Zalo API
 let zaloApi = null;
 
+// Load cookie data from external file or fallback to built-in
+function loadCookieData() {
+    const externalCookiePath = path.join(__dirname, 'config', 'cookies.json');
+
+    try {
+        if (fs.existsSync(externalCookiePath)) {
+            console.log('Loading cookies from external file:', externalCookiePath);
+            const cookieDataRaw = fs.readFileSync(externalCookiePath, 'utf8');
+            const cookieData = JSON.parse(cookieDataRaw);
+
+            // Validate that we have an array of cookies
+            if (Array.isArray(cookieData) && cookieData.length > 0) {
+                console.log(`Loaded ${cookieData.length} cookies from external configuration`);
+                return cookieData;
+            } else {
+                console.warn('External cookie file exists but contains invalid data, using fallback');
+            }
+        } else {
+            console.log('External cookie file not found, using built-in cookie data');
+        }
+    } catch (error) {
+        console.error('Error loading external cookie file:', error.message);
+        console.log('Falling back to built-in cookie data');
+    }
+
+    // Fallback to built-in cookie data
+    console.log('Using built-in cookie data from cookieData.js');
+    return cookieDataFallback;
+}
+
 // Ensure upload directory exists
 function ensureUploadDirectory() {
     const uploadDir = path.join(__dirname, 'uploads');
@@ -35,6 +65,16 @@ function ensureUploadDirectory() {
         console.log('Created uploads directory');
     }
     return uploadDir;
+}
+
+// Ensure config directory exists
+function ensureConfigDirectory() {
+    const configDir = path.join(__dirname, 'config');
+    if (!fs.existsSync(configDir)) {
+        fs.mkdirSync(configDir, { recursive: true });
+        console.log('Created config directory');
+    }
+    return configDir;
 }
 
 // Remove auto-print functionality from PDF buffer
@@ -132,6 +172,12 @@ async function initializeZalo() {
         if (!z_uuid || !userAgent) {
             throw new Error('Missing Z_UUID or USER_AGENT in environment variables');
         }
+
+        // Ensure config directory exists
+        ensureConfigDirectory();
+
+        // Load cookie data (external or fallback)
+        const cookieData = loadCookieData();
 
         // Create new Zalo instance with options
         const zalo = new Zalo({

@@ -1,0 +1,54 @@
+[
+    {
+        "domain": ".zalo.me",
+        "expirationDate": 1757043855.9959,
+        "hostOnly": false,
+        "httpOnly": false,
+        "name": "_zlang",
+        "path": "/",
+        "sameSite": null,
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "vn"
+    },
+    {
+        "domain": ".chat.zalo.me",
+        "expirationDate": 1757562255.868683,
+        "hostOnly": false,
+        "httpOnly": true,
+        "name": "zpw_sek",
+        "path": "/",
+        "sameSite": "lax",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "REPLACE_WITH_YOUR_ZPW_SEK_VALUE"
+    },
+    {
+        "domain": ".zalo.me",
+        "expirationDate": 1791517456.071917,
+        "hostOnly": false,
+        "httpOnly": false,
+        "name": "__zi",
+        "path": "/",
+        "sameSite": "no_restriction",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "REPLACE_WITH_YOUR_ZI_VALUE"
+    },
+    {
+        "domain": ".zalo.me",
+        "expirationDate": 1788493455.580307,
+        "hostOnly": false,
+        "httpOnly": true,
+        "name": "zpsid",
+        "path": "/",
+        "sameSite": "no_restriction",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "REPLACE_WITH_YOUR_ZPSID_VALUE"
+    }
+]

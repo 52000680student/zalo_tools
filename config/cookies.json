@@ -1,0 +1,54 @@
+[
+    {
+        "domain": ".zalo.me",
+        "expirationDate": 1757055290.513952,
+        "hostOnly": false,
+        "httpOnly": false,
+        "name": "_zlang",
+        "path": "/",
+        "sameSite": null,
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "vn"
+    },
+    {
+        "domain": ".chat.zalo.me",
+        "expirationDate": 1757573690.44679,
+        "hostOnly": false,
+        "httpOnly": true,
+        "name": "zpw_sek",
+        "path": "/",
+        "sameSite": "lax",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "uaHQ.440367783.a0.wOBScy6zdEjcnwFnuBsSwxgV-O3ZXxwPb8lFkulGfDEPXDkQaPR_W9J5s8U0WA79l9VgyKSwZw-El2NSUDMSwm"
+    },
+    {
+        "domain": ".zalo.me",
+        "expirationDate": 1791528890.510026,
+        "hostOnly": false,
+        "httpOnly": false,
+        "name": "__zi",
+        "path": "/",
+        "sameSite": "no_restriction",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "3000.SSZzejyD6zOgdh2mtnLQWYQN_RAG01ICFjIXe9fEM8WwcUwYcKbJZN6VuQJGJ5QAVPdhhZam.1"
+    },
+    {
+        "domain": ".zalo.me",
+        "expirationDate": 1788504890.186568,
+        "hostOnly": false,
+        "httpOnly": true,
+        "name": "zpsid",
+        "path": "/",
+        "sameSite": "no_restriction",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "uYsd.440367783.4.rEXFbmoqKVwhpcxa0BHH_dd78yeuX6B8EuDfpIR2ItYBfnMn3GrcHsIqKVu"
+    }
+]
